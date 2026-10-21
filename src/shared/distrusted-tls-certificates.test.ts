@@ -18,18 +18,17 @@ function commonName(pem: string): string {
   return new X509Certificate(pem).subject.match(/^CN=(.+)$/m)?.[1] ?? ''
 }
 
+const fixtureCertificates =
+  readFileSync(join(__dirname, '__fixtures__', 'distrusted-emsign-certificates.pem'), 'utf8').match(
+    /-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g
+  ) ?? []
+
 describe('isDistrustedTlsCertificate', () => {
   it('distrusts every fixture certificate, including Sectigo cross-signed copies of each key', () => {
-    const certificates =
-      readFileSync(
-        join(__dirname, '__fixtures__', 'distrusted-emsign-certificates.pem'),
-        'utf8'
-      ).match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? []
-
-    expect(certificates).toHaveLength(19)
-    expect(certificates.filter((pem) => !isDistrustedTlsCertificate(pem)).map(commonName)).toEqual(
-      []
-    )
+    expect(fixtureCertificates).toHaveLength(19)
+    expect(
+      fixtureCertificates.filter((pem) => !isDistrustedTlsCertificate(pem)).map(commonName)
+    ).toEqual([])
   })
 
   it('ignores input that is not a certificate', () => {
@@ -48,13 +47,19 @@ describe('removeDistrustedRootsFromDefaultTlsTrust', () => {
   it('drops exactly the roots NSS removed and keeps every other default root', () => {
     const fingerprint = (pem: string): string => new X509Certificate(pem).fingerprint256
 
+    const fixtureRoots = fixtureCertificates.filter((pem) =>
+      NSS_REMOVED_ROOTS.includes(commonName(pem))
+    )
+    expect(fixtureRoots.map(commonName).sort()).toEqual([...NSS_REMOVED_ROOTS].sort())
+    const retained = original.filter((pem) => !NSS_REMOVED_ROOTS.includes(commonName(pem)))
+    tls.setDefaultCACertificates([...retained, ...fixtureRoots])
+
     removeDistrustedRootsFromDefaultTlsTrust()
 
     const remaining = new Set(tls.getCACertificates('default').map(fingerprint))
-    const removed = original.filter((pem) => !remaining.has(fingerprint(pem))).map(commonName)
-    const expectedRemoved = original
-      .map(commonName)
-      .filter((name) => NSS_REMOVED_ROOTS.includes(name))
-    expect(removed.sort()).toEqual(expectedRemoved.sort())
+    expect(remaining).toEqual(new Set(retained.map(fingerprint)))
+    for (const pem of fixtureRoots) {
+      expect(remaining.has(fingerprint(pem))).toBe(false)
+    }
   })
 })

@@ -8,7 +8,10 @@ const USE_CHROMIUM_RESULT = -3
 const MAX_CHAIN_LENGTH = 16
 
 type CertificateChainLink = { data: string; issuerCert?: CertificateChainLink }
-type VerifiedChainRequest = { errorCode: number; validatedCertificate?: CertificateChainLink }
+type VerifiedChainRequest = {
+  certificate?: CertificateChainLink
+  validatedCertificate?: CertificateChainLink
+}
 
 function chainHasDistrustedKey(leaf: CertificateChainLink | undefined): boolean {
   let certificate = leaf
@@ -25,7 +28,10 @@ function verifyAgainstDistrustedKeys(
   request: VerifiedChainRequest,
   callback: (verificationResult: number) => void
 ): void {
-  const distrusted = request.errorCode === 0 && chainHasDistrustedKey(request.validatedCertificate)
+  // Failed verification can leave only the server-provided chain available.
+  const distrusted =
+    chainHasDistrustedKey(request.validatedCertificate) ||
+    chainHasDistrustedKey(request.certificate)
   callback(distrusted ? ERR_CERT_REVOKED : USE_CHROMIUM_RESULT)
 }
 

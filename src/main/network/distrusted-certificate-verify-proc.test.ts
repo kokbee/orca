@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type ChainLink = { data: string; issuerCert?: ChainLink }
 type VerifyProc = (
-  request: { errorCode: number; validatedCertificate?: ChainLink },
+  request: { errorCode: number; certificate?: ChainLink; validatedCertificate?: ChainLink },
   callback: (result: number) => void
 ) => void
 
@@ -75,9 +75,13 @@ function sessionVerifyProc(): VerifyProc {
   return installed
 }
 
-function verify(validatedCertificate: ChainLink | undefined, errorCode = 0): number | undefined {
+function verify(
+  validatedCertificate: ChainLink | undefined,
+  errorCode = 0,
+  certificate?: ChainLink
+): number | undefined {
   let result: number | undefined
-  sessionVerifyProc()({ validatedCertificate, errorCode }, (value) => {
+  sessionVerifyProc()({ validatedCertificate, certificate, errorCode }, (value) => {
     result = value
   })
   return result
@@ -105,8 +109,20 @@ describe('installDistrustedCertificateVerifyProc', () => {
     expect(verify(chain(leafStandIn, nssRemovedRoot))).toBe(-206)
   })
 
-  it("keeps Chromium's verdict for unaffected chains and chains it already rejected", () => {
-    expect(verify(chain(leafStandIn, trustedRoot('ISRG Root X1')))).toBe(-3)
-    expect(verify(chain(leafStandIn, crossSignedIntermediate), -202)).toBe(-3)
+  it('revokes compromised chains even when Chromium reports an overridable authority error', () => {
+    expect(verify(chain(leafStandIn, crossSignedIntermediate), -202)).toBe(-206)
+  })
+
+  it('checks the presented chain when verification omits or truncates the validated chain', () => {
+    const presented = chain(leafStandIn, crossSignedIntermediate)
+    expect(verify(undefined, -202, presented)).toBe(-206)
+    expect(verify(chain(leafStandIn), -202, presented)).toBe(-206)
+  })
+
+  it("keeps Chromium's verdict for unaffected chains, including local authority errors", () => {
+    const unaffected = chain(leafStandIn, trustedRoot('ISRG Root X1'))
+    expect(verify(unaffected)).toBe(-3)
+    expect(verify(unaffected, -202)).toBe(-3)
+    expect(verify(undefined, -202, unaffected)).toBe(-3)
   })
 })
