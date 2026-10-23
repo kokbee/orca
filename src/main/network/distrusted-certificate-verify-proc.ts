@@ -5,7 +5,6 @@ import { isDistrustedTlsCertificate } from '../../shared/distrusted-tls-certific
 const ERR_CERT_REVOKED = -206
 // Keeps Chromium's own verdict, Certificate Transparency included.
 const USE_CHROMIUM_RESULT = -3
-const MAX_CHAIN_LENGTH = 16
 
 type CertificateChainLink = { data: string; issuerCert?: CertificateChainLink }
 type VerifiedChainRequest = {
@@ -15,7 +14,9 @@ type VerifiedChainRequest = {
 
 function chainHasDistrustedKey(leaf: CertificateChainLink | undefined): boolean {
   let certificate = leaf
-  for (let depth = 0; certificate && depth < MAX_CHAIN_LENGTH; depth++) {
+  const visited = new Set<CertificateChainLink>()
+  while (certificate && !visited.has(certificate)) {
+    visited.add(certificate)
     if (isDistrustedTlsCertificate(certificate.data)) {
       return true
     }

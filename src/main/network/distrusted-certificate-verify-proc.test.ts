@@ -119,6 +119,29 @@ describe('installDistrustedCertificateVerifyProc', () => {
     expect(verify(chain(leafStandIn), -202, presented)).toBe(-206)
   })
 
+  it.each([16, 24])('revokes a distrusted key at depth %i in either chain', (depth) => {
+    const longChain = chain(...Array.from({ length: depth }, () => leafStandIn), nssRemovedRoot)
+    expect(verify(longChain)).toBe(-206)
+    expect(verify(chain(leafStandIn), -202, longChain)).toBe(-206)
+  })
+
+  it.each([1, 3])('terminates an unaffected cycle of %i certificates', (length) => {
+    const links: ChainLink[] = Array.from({ length }, () => ({ data: leafStandIn }))
+    for (const [index, link] of links.entries()) {
+      link.issuerCert = links[(index + 1) % links.length]
+    }
+    expect(verify(links[0])).toBe(-3)
+    expect(verify(undefined, -202, links[0])).toBe(-3)
+  })
+
+  it('revokes a distrusted key inside a cycle', () => {
+    const leaf: ChainLink = { data: leafStandIn }
+    const issuer: ChainLink = { data: crossSignedIntermediate, issuerCert: leaf }
+    leaf.issuerCert = issuer
+    expect(verify(leaf)).toBe(-206)
+    expect(verify(undefined, -202, leaf)).toBe(-206)
+  })
+
   it("keeps Chromium's verdict for unaffected chains, including local authority errors", () => {
     const unaffected = chain(leafStandIn, trustedRoot('ISRG Root X1'))
     expect(verify(unaffected)).toBe(-3)
