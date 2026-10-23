@@ -78,7 +78,7 @@ export async function buildPtyIpcSpawnOptions(ctx: PtyIpcSpawnState): Promise<vo
   ctx.finishTerminalInstall = beginPtySpawnForWorktree(args.worktreeId, ctx.cwd, args.connectionId)
   ctx.initiallyHidden = args.initiallyHidden === true
   // Why: daemon PTYs can emit before spawn() resolves, so the hidden mark must beat byte zero (terminal-query-authority.md §races); other providers are safe with the post-spawn mark below.
-  // TEMPORARY (C5e): absent-owner cleanup clears the early mark before replacement spawn.
+  // TEMPORARY (attachment-derived delivery lane): a renderer reset may clear the early mark after preflight.
   ctx.preSpawnHiddenMarkId =
     ctx.initiallyHidden && ctx.isDaemonHostSpawn && ctx.effectiveSessionAppId !== undefined
       ? ctx.effectiveSessionAppId
@@ -91,7 +91,14 @@ export async function buildPtyIpcSpawnOptions(ctx: PtyIpcSpawnState): Promise<vo
   ctx.releaseWorktreeSpawn = acquireWorktreeSpawn
     ? await acquireWorktreeSpawn.call(
         runtime,
-        spawnWorktreeTarget(args.worktreeId, args.connectionId)
+        spawnWorktreeTarget(args.worktreeId, args.connectionId),
+        {
+          // A pre-adopted stable pane attaches to its live owner, not a new terminal.
+          reattachSessionId: ctx.preAdoptedStablePane?.owner.ptyId ?? args.sessionId,
+          requireAttachOnly: () => {
+            ctx.spawnOptions = { ...ctx.spawnOptions, attachOnly: true }
+          }
+        }
       )
     : undefined
 }

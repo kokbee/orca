@@ -42,10 +42,6 @@ import type {
   RuntimeTerminalCreateRequestPayload,
   RuntimeTerminalPresentation
 } from '../../shared/runtime-types'
-import type {
-  RuntimeMobileMarkdownRequest,
-  RuntimeMobileMarkdownResponse
-} from '../../shared/mobile-markdown-document'
 import type { TerminalTabCreateReply } from '../../shared/terminal-reveal-identity'
 import type {
   TerminalTabCloseRequest,
@@ -55,10 +51,7 @@ import type {
   SessionTabCloseRequest,
   SessionTabCloseResponse
 } from '../../shared/session-tab-close'
-import type {
-  WorktreeSleepRequest,
-  WorktreeSleepResponse
-} from '../../shared/worktree-sleep-request'
+import type { WorkspaceSleepNotice } from '../../shared/workspace-sleep'
 import type {
   RemoteCliBrowserScopeQuery,
   RemoteCliBrowserScopeReply
@@ -287,14 +280,11 @@ export type UiCommandEventApi = {
       navigation?: RuntimeNavigationTarget
     }) => void
   ) => () => void
-  onMobileMarkdownRequest: (callback: (request: RuntimeMobileMarkdownRequest) => void) => () => void
-  respondMobileMarkdownRequest: (response: RuntimeMobileMarkdownResponse) => void
   onCloseTerminal: (callback: (target: TerminalSurfaceCloseTarget) => void) => () => void
   onTerminalTabCloseRequest: (callback: (request: TerminalTabCloseRequest) => void) => () => void
   respondTerminalTabClose: (response: TerminalTabCloseResponse) => void
-  onSleepWorktree: (callback: (data: { worktreeId: string }) => void) => () => void
-  onWorktreeSleepRequest: (callback: (request: WorktreeSleepRequest) => void) => () => void
-  respondWorktreeSleep: (response: WorktreeSleepResponse) => void
+  /** A sleep main runs on this window's workspace, whoever asked; the window follows it. */
+  onWorkspaceSleep: (callback: (notice: WorkspaceSleepNotice) => void) => () => void
   onResumeSleepingAgents: (callback: (data: { worktreeId: string }) => void) => () => void
   onTerminalZoom: (callback: (direction: 'in' | 'out' | 'reset') => void) => () => void
   onSystemResumed: (callback: () => void) => () => void
